@@ -1,0 +1,90 @@
+Whitelabel Error Page
+
+This application has no explicit mapping for /error, so you are seeing this as a fallback.
+Sat Mar 07 23:26:47 EST 2015
+There was an unexpected error (type=Unauthorized, status=401).
+Full authentication is required to access this resource
+
+Exception handling
+
+http://www.codingpedia.org/ama/error-handling-in-rest-api-with-jersey/
+https://blog.apigee.com/detail/restful_api_design_what_about_errors
+http://www.codingpedia.org/ama/resources-on-how-to-design-error-handling-in-a-rest-api/
+
+4xx Client error –  codes are used to tell the client that a fault has taken place on THEIR side. They should not re-transmit the same request again, but fix the error first.
+5xx Server error – codes that tell the client the server failed to fulfill an apparently valid request.  The client can continue and try again with the request without modification.
+
+{
+   "status": 400,
+   "code": 4000,
+   "message": "Provided data not sufficient for insertion",
+   "link": "http://www.codingpedia.org/ama/tutorial-rest-api-design-and-implementation-with-jersey-and-spring",
+   "developerMessage": "Please verify that the feed is properly generated/set"
+}
+
+status – holds redundantly the HTTP error status code, so that the developer can “see” it without having to analyze the response’s header
+code – this is an internal code specific to the API (should be more relevant for business exceptions)
+message – short description of the error, what might have cause it and possibly a “fixing” proposal
+link – points to an online resource, where more details can be found about the error
+developerMessage – detailed message, containing additional data that might be relevant to the developer. This should only be available when the “debug” mode is switched on and could potentially contain stack trace information or something similar
+
+
+Implementation:
+WebApplicationExceptionOR/AND
+mapping exceptions to responses via ExceptionMappers
+
+“Checked Exceptions should be used to declare for expected, but unpreventable errors that are reasonable to recover from.“
+
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+
+public class AppExceptionMapper implements ExceptionMapper<AppException> {
+
+	public Response toResponse(AppException ex) {
+		return Response.status(ex.getStatus())
+				.entity(new ErrorMessage(ex))
+				.type(MediaType.APPLICATION_JSON).
+				build();
+	}
+
+}
+
+“Unchecked Exceptions should be used for everything else.”
+
+import org.codingpedia.demo.rest.filters.AppConstants;
+
+public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
+	
+	@Override 
+	public Response toResponse(Throwable ex) {
+
+		ErrorMessage errorMessage = new ErrorMessage();		
+		setHttpStatus(ex, errorMessage);
+		errorMessage.setCode(AppConstants.GENERIC_APP_ERROR_CODE);
+		errorMessage.setMessage(ex.getMessage());
+		StringWriter errorStackTrace = new StringWriter();
+		ex.printStackTrace(new PrintWriter(errorStackTrace));
+		errorMessage.setDeveloperMessage(errorStackTrace.toString());
+		errorMessage.setLink(AppConstants.BLOG_POST_URL);
+
+		return Response.status(errorMessage.getStatus())
+				.entity(errorMessage)
+				.type(MediaType.APPLICATION_JSON)
+				.build();	
+	}
+
+	private void setHttpStatus(Throwable ex, ErrorMessage errorMessage) {
+		if(ex instanceof WebApplicationException ) {
+			errorMessage.setStatus(((WebApplicationException)ex).getResponse().getStatus());
+		} else {
+			errorMessage.setStatus(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()); //defaults to internal server error 500
+		}
+	}
+}
+
+3.REST API escape html
+
+4.customized security http header
+
+5.compress respnse
